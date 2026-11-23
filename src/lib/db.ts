@@ -1,4 +1,5 @@
 import type { PersistedAppState } from '../types/app';
+import bundledGiftManifestRaw from '../data/bundledGiftManifest.json';
 
 const DB_NAME = 'kishu_birthday_gift_db';
 const DB_VERSION = 1;
@@ -395,13 +396,37 @@ export async function importFullBackup(file: File): Promise<PersistedAppState> {
   return importBackupData(parsed);
 }
 
+export const BUNDLED_GIFT_MANIFEST = bundledGiftManifestRaw as unknown as BundledManifestArchive;
+
+export const BUNDLED_PHOTO_IDS: ReadonlySet<string> = new Set(
+  (BUNDLED_GIFT_MANIFEST?.state?.photos || []).map((p) => p.id)
+);
+
+export function getBundledGiftManifestState(): PersistedAppState | null {
+  if (
+    !BUNDLED_GIFT_MANIFEST ||
+    BUNDLED_GIFT_MANIFEST.magic !== 'KISHU_GIFT_MANIFEST_V1' ||
+    !BUNDLED_GIFT_MANIFEST.state
+  ) {
+    return null;
+  }
+  const cloned = JSON.parse(JSON.stringify(BUNDLED_GIFT_MANIFEST.state)) as PersistedAppState;
+  cloned.photos = (cloned.photos || []).map((p) => ({ ...p, bundled: true }));
+  cloned.bundledSeedStamp = BUNDLED_GIFT_MANIFEST.exportedAt || new Date().toISOString();
+  return cloned;
+}
+
 /**
- * Checks if a pre-packaged gift manifest (public/kishu-gift-manifest.json + public/bundled-photos/)
- * or full archive (public/kishu-gift-bundle.json) was bundled inside the APK/web build.
- * On first launch (or upgrading from an empty APK), automatically loads all photos,
- * audio metadata, collages, and personal messages so Kishu opens the APK with everything offline.
+ * Loads the pre-packaged gift manifest compiled into the app bundle (with optional
+ * runtime JSON fallback) so Kishu opens the APK/PWA with all 372 photos offline immediately.
  */
 export async function tryLoadBundledGiftArchive(): Promise<PersistedAppState | null> {
+  const compiledState = getBundledGiftManifestState();
+  if (compiledState && compiledState.photos.length > 0) {
+    await savePersistedState(compiledState);
+    return compiledState;
+  }
+
   try {
     const manifestRes = await fetch('./kishu-gift-manifest.json', { cache: 'no-store' });
     if (manifestRes.ok) {
@@ -411,6 +436,7 @@ export async function tryLoadBundledGiftArchive(): Promise<PersistedAppState | n
         if (parsed && parsed.magic === 'KISHU_GIFT_MANIFEST_V1' && parsed.state) {
           const restoredState: PersistedAppState = {
             ...parsed.state,
+            photos: (parsed.state.photos || []).map((p) => ({ ...p, bundled: true })),
             bundledSeedStamp: parsed.exportedAt || new Date().toISOString(),
           };
           await savePersistedState(restoredState);

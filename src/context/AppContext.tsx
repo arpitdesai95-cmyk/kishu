@@ -1,10 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { BUNDLED_THEME_SONG_ID, createDefaultState } from '../data/defaults';
 import {
+  BUNDLED_PHOTO_IDS,
   clearAllDatabase,
   deleteAudioBlob,
   deletePhotoBlobs,
   getAudioBlob,
+  getBundledGiftManifestState,
   getPhotoBlobs,
   loadPersistedState,
   optimizeImageFile,
@@ -135,7 +137,9 @@ function makeId(prefix: string): string {
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [ready, setReady] = useState(false);
-  const [state, setState] = useState<PersistedAppState>(() => createDefaultState());
+  const [state, setState] = useState<PersistedAppState>(
+    () => getBundledGiftManifestState() || createDefaultState()
+  );
   const [screen, setScreen] = useState<ScreenId>('first');
   const [navPayload, setNavPayload] = useState<NavigationPayload>({});
   const [historyStack, setHistoryStack] = useState<Array<{ screen: ScreenId; payload: NavigationPayload }>>([]);
@@ -175,18 +179,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     (async () => {
       try {
         let stored = await loadPersistedState();
-        if (!stored) {
-          stored = await tryLoadBundledGiftArchive();
-        } else if (
-          Array.isArray(stored.photos) &&
-          stored.photos.length === 0 &&
-          !stored.bundledSeedStamp
-        ) {
-          // If an earlier APK without a bundle saved an empty default state,
-          // automatically unpack kishu-gift-bundle.json once it becomes available.
+        const compiledBundled = getBundledGiftManifestState();
+        if (!stored || !Array.isArray(stored.photos) || stored.photos.length === 0) {
           const bundled = await tryLoadBundledGiftArchive();
           if (bundled && bundled.photos.length > 0) {
             stored = bundled;
+          }
+        } else if (compiledBundled && compiledBundled.photos.length > 0) {
+          const needsSeedSync =
+            stored.bundledSeedStamp !== compiledBundled.bundledSeedStamp ||
+            stored.photos.some((p) => BUNDLED_PHOTO_IDS.has(p.id) && !p.bundled);
+
+          if (needsSeedSync) {
+            const existingIds = new Set(stored.photos.map((p) => p.id));
+            const upgradedPhotos = stored.photos.map((p) =>
+              BUNDLED_PHOTO_IDS.has(p.id) ? { ...p, bundled: true } : p
+            );
+            const missingBundledPhotos = compiledBundled.photos.filter(
+              (bp) => !existingIds.has(bp.id)
+            );
+            const existingAlbums = Array.isArray(stored.albums) ? stored.albums : [];
+            const existingAlbumIds = new Set(existingAlbums.map((a) => a.id));
+            const mergedBundledAlbums = [
+              ...existingAlbums.map((a) => {
+                const match = compiledBundled.albums.find((ba) => ba.id === a.id);
+                return !a.coverPhotoId && match?.coverPhotoId
+                  ? { ...a, coverPhotoId: match.coverPhotoId }
+                  : a;
+              }),
+              ...compiledBundled.albums.filter((ba) => !existingAlbumIds.has(ba.id)),
+            ];
+            stored = {
+              ...stored,
+              albums: mergedBundledAlbums,
+              photos: [...upgradedPhotos, ...missingBundledPhotos],
+              bundledSeedStamp: compiledBundled.bundledSeedStamp,
+            };
+            await savePersistedState(stored);
           }
         }
         if (active && stored) {
@@ -546,7 +575,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getPhotoUrl = useCallback(
     (photoId: string, variant: 'thumb' | 'full' = 'thumb'): string | null => {
       const photo = stateRef.current.photos.find((p) => p.id === photoId);
-      if (photo?.bundled) {
+      if (photo?.bundled || BUNDLED_PHOTO_IDS.has(photoId)) {
         return `./bundled-photos/${photoId}_${variant}.jpg`;
       }
       if (variant === 'full') {
@@ -1288,10 +1317,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fullUrlsRef.current = {};
     setThumbUrls({});
     setFullUrls({});
-    const fresh = createDefaultState();
+    const fresh = (await tryLoadBundledGiftArchive()) || createDefaultState();
     setState(fresh);
     await savePersistedState(fresh);
-    showToast('App reset to initial state');
+    showToast('App reset to initial gift state ❤️');
   }, [pauseMusic, showToast]);
 
   return (
