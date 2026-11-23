@@ -907,7 +907,12 @@ export const SurpriseJourney: React.FC = () => {
                     >
                       <div className="aspect-[4/3] w-full overflow-hidden rounded-[2px] bg-[#2C1620]">
                         {leadPhoto ? (
-                          <PhotoImage photoId={leadPhoto.id} variant="thumb" alt={stop.title} />
+                          <PhotoImage
+                            photoId={leadPhoto.id}
+                            variant="thumb"
+                            alt={stop.title}
+                            fallbackSrc={stop.fallbackImg}
+                          />
                         ) : (
                           <ScenicImage
                             src={stop.fallbackImg}

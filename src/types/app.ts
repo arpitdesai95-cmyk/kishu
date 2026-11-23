@@ -64,6 +64,7 @@ export interface PhotoItem {
   height: number;
   mimeType: string;
   bundled?: boolean;
+  bundledUrl?: string;
 }
 
 export interface SavedCollage {

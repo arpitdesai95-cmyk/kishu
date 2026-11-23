@@ -8,6 +8,7 @@ interface PhotoImageProps {
   alt?: string;
   className?: string;
   loading?: 'lazy' | 'eager';
+  fallbackSrc?: string;
 }
 
 export const PhotoImage: React.FC<PhotoImageProps> = ({
@@ -16,6 +17,7 @@ export const PhotoImage: React.FC<PhotoImageProps> = ({
   alt = 'Our memory',
   className = 'w-full h-full object-cover object-[50%_18%]',
   loading = 'lazy',
+  fallbackSrc,
 }) => {
   const { getPhotoUrl } = useApp();
   const [failed, setFailed] = useState(false);
@@ -26,6 +28,15 @@ export const PhotoImage: React.FC<PhotoImageProps> = ({
   }, [url]);
 
   if (!url || failed) {
+    if (fallbackSrc) {
+      return (
+        <img
+          src={fallbackSrc}
+          alt={alt}
+          className={className}
+        />
+      );
+    }
     return (
       <div className="w-full h-full min-h-[72px] flex items-center justify-center bg-[#EFE3DA] text-[#9A786E]">
         <ImageIcon className="w-5 h-5 opacity-55" />

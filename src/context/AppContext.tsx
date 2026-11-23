@@ -186,15 +186,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             stored = bundled;
           }
         } else if (compiledBundled && compiledBundled.photos.length > 0) {
+          const compiledById = new Map(compiledBundled.photos.map((bp) => [bp.id, bp]));
           const needsSeedSync =
             stored.bundledSeedStamp !== compiledBundled.bundledSeedStamp ||
-            stored.photos.some((p) => BUNDLED_PHOTO_IDS.has(p.id) && !p.bundled);
+            stored.photos.some((p) => {
+              const match = compiledById.get(p.id);
+              return (
+                (match?.bundledUrl && p.bundledUrl !== match.bundledUrl) ||
+                (BUNDLED_PHOTO_IDS.has(p.id) && !p.bundled)
+              );
+            });
 
           if (needsSeedSync) {
             const existingIds = new Set(stored.photos.map((p) => p.id));
-            const upgradedPhotos = stored.photos.map((p) =>
-              BUNDLED_PHOTO_IDS.has(p.id) ? { ...p, bundled: true } : p
-            );
+            const upgradedPhotos = stored.photos.map((p) => {
+              const match = compiledById.get(p.id);
+              if (match) {
+                return {
+                  ...p,
+                  bundled: true,
+                  bundledUrl: match.bundledUrl || p.bundledUrl,
+                };
+              }
+              return BUNDLED_PHOTO_IDS.has(p.id) ? { ...p, bundled: true } : p;
+            });
             const missingBundledPhotos = compiledBundled.photos.filter(
               (bp) => !existingIds.has(bp.id)
             );
@@ -575,6 +590,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const getPhotoUrl = useCallback(
     (photoId: string, variant: 'thumb' | 'full' = 'thumb'): string | null => {
       const photo = stateRef.current.photos.find((p) => p.id === photoId);
+      if (photo?.bundledUrl) {
+        return photo.bundledUrl;
+      }
       if (photo?.bundled || BUNDLED_PHOTO_IDS.has(photoId)) {
         return `./bundled-photos/${photoId}_${variant}.jpg`;
       }
