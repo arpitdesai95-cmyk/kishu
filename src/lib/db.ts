@@ -1,5 +1,5 @@
 import type { PersistedAppState } from '../types/app';
-import bundledGiftManifestRaw from '../data/bundledGiftManifest.json';
+import { BUNDLED_GIFT_MANIFEST_DATA } from '../data/bundledGiftManifest';
 
 const DB_NAME = 'kishu_birthday_gift_db';
 const DB_VERSION = 1;
@@ -396,7 +396,7 @@ export async function importFullBackup(file: File): Promise<PersistedAppState> {
   return importBackupData(parsed);
 }
 
-export const BUNDLED_GIFT_MANIFEST = bundledGiftManifestRaw as unknown as BundledManifestArchive;
+export const BUNDLED_GIFT_MANIFEST = BUNDLED_GIFT_MANIFEST_DATA as unknown as BundledManifestArchive;
 
 export const BUNDLED_PHOTO_IDS: ReadonlySet<string> = new Set(
   (BUNDLED_GIFT_MANIFEST?.state?.photos || []).map((p) => p.id)
