@@ -1,0 +1,8 @@
+{
+  "name": " Kishu ❤️",
+  "description": "A private birthday love-story gift from Arpit to Kishu — our journey, memories, letters, and forever ahead.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
