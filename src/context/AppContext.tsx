@@ -199,17 +199,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           if (needsSeedSync) {
             const existingIds = new Set(stored.photos.map((p) => p.id));
-            const upgradedPhotos = stored.photos.map((p) => {
-              const match = compiledById.get(p.id);
-              if (match) {
-                return {
-                  ...p,
-                  bundled: true,
-                  bundledUrl: match.bundledUrl || p.bundledUrl,
-                };
-              }
-              return BUNDLED_PHOTO_IDS.has(p.id) ? { ...p, bundled: true } : p;
-            });
+            const upgradedPhotos = stored.photos
+              .filter((p) => !p.bundled || compiledById.has(p.id))
+              .map((p) => {
+                const match = compiledById.get(p.id);
+                if (match) {
+                  return {
+                    ...p,
+                    bundled: true,
+                    bundledUrl: match.bundledUrl || p.bundledUrl,
+                  };
+                }
+                return BUNDLED_PHOTO_IDS.has(p.id) ? { ...p, bundled: true } : p;
+              });
             const missingBundledPhotos = compiledBundled.photos.filter(
               (bp) => !existingIds.has(bp.id)
             );
